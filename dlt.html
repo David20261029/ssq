@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>超级大乐透 AI 选号</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 0%,#1e2a4a,#0b0f1a 70%);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#e8ecf4;padding:20px}
+  h1{font-size:21px;letter-spacing:1.5px;margin:0 0 6px;text-align:center}
+  .sub{font-size:12px;color:#7f8aa3;margin-bottom:26px;text-align:center}
+  .board{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:18px 14px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;min-height:88px;width:100%;max-width:420px}
+  .ball{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;box-shadow:inset -2px -3px 8px rgba(0,0,0,.35),inset 2px 2px 6px rgba(255,255,255,.25),0 4px 12px rgba(0,0,0,.45)}
+  .red{background:radial-gradient(circle at 32% 28%,#ff7b7b,#b02a1f)}
+  .blue{background:radial-gradient(circle at 32% 28%,#6dc0f0,#155a8a)}
+  .sep{margin-left:10px}
+  .pop{animation:pop .35s ease}
+  @keyframes pop{0%{transform:scale(.5);opacity:.3}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  .empty .ball{opacity:.18}
+  .btns{display:flex;gap:12px;margin-top:24px}
+  button{border:none;cursor:pointer;padding:13px 26px;border-radius:999px;font-size:15px;font-weight:600;color:#fff;letter-spacing:1px;transition:transform .12s,filter .2s}
+  button:active{transform:scale(.95)}
+  button:disabled{filter:grayscale(.6) brightness(.7);cursor:not-allowed}
+  .smart{background:linear-gradient(135deg,#e74c3c,#c0392b);box-shadow:0 8px 22px rgba(231,76,60,.35)}
+  .random{background:linear-gradient(135deg,#3498db,#2471a3);box-shadow:0 8px 22px rgba(52,152,219,.35)}
+  .tip{margin-top:26px;font-size:11px;color:#5f6b85;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+  <h1>🎯 超级大乐透 AI 选号</h1>
+  <div class="sub">前区 35 选 5 · 后区 12 选 2</div>
+
+  <div class="board empty" id="board">
+    <div class="ball red">?</div><div class="ball red">?</div><div class="ball red">?</div>
+    <div class="ball red">?</div><div class="ball red">?</div>
+    <div class="ball blue sep">?</div><div class="ball blue">?</div>
+  </div>
+
+  <div class="btns">
+    <button class="smart" id="smartBtn">智能选号</button>
+    <button class="random" id="randomBtn">纯随机</button>
+  </div>
+
+  <div class="tip">仅供娱乐参考 · 理性购彩<br>每期开奖均为独立随机事件，任何算法都无法预测</div>
+
+<script>
+const FRONT_POOL = Array.from({length:35},(_,i)=>i+1);
+const BACK_POOL  = Array.from({length:12},(_,i)=>i+1);
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function weightedSample(pool,k,wf){
+  const c=[...pool],o=[];
+  for(let i=0;i<k;i++){
+    const w=c.map(wf),t=w.reduce((a,b)=>a+b,0);
+    let r=Math.random()*t,idx=c.length-1;
+    for(let j=0;j<c.length;j++){ r-=w[j]; if(r<=0){idx=j;break;} }
+    o.push(c[idx]); c.splice(idx,1);
+  }
+  return o.sort((a,b)=>a-b);
+}
+
+const fw = n => (n>=10&&n<=26) ? 1.2 : (n<=5||n>=31 ? 0.7 : 1.0);
+const bw = n => (n>=4&&n<=9)  ? 1.3 : 0.8;
+
+const sumOk    = r => { const s=r.reduce((a,b)=>a+b,0); return s>=55 && s<=130; };
+const noTriple = r => {
+  for(let i=0;i<r.length-2;i++)
+    if(r[i+1]===r[i]+1 && r[i+2]===r[i]+2) return false;
+  return true;
+};
+
+function genSmart(){
+  let f,b,g=0;
+  do{
+    f = weightedSample(FRONT_POOL,5,fw);
+    b = weightedSample(BACK_POOL,2,bw);
+    g++;
+  }while((!sumOk(f)||!noTriple(f)) && g<500);
+  return {front:f, back:b};
+}
+
+function genRandom(){
+  return {
+    front: shuffle(FRONT_POOL).slice(0,5).sort((a,b)=>a-b),
+    back:  shuffle(BACK_POOL).slice(0,2).sort((a,b)=>a-b)
+  };
+}
+
+const board      = document.getElementById('board');
+const frontBalls = board.querySelectorAll('.ball.red');
+const backBalls  = board.querySelectorAll('.ball.blue');
+const smartBtn   = document.getElementById('smartBtn');
+const randomBtn  = document.getElementById('randomBtn');
+const pad = n => String(n).padStart(2,'0');
+
+function render(d, anim){
+  board.classList.remove('empty');
+  d.front.forEach((n,i)=>{ frontBalls[i].textContent = pad(n); });
+  d.back.forEach((n,i)=>{ backBalls[i].textContent  = pad(n); });
+  if(anim){
+    [...frontBalls,...backBalls].forEach(el=>{
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop');
+    });
+  }
+}
+
+let rolling = false;
+function playRoll(finalData){
+  if(rolling) return;
+  rolling = true;
+  smartBtn.disabled = randomBtn.disabled = true;
+  let ticks = 0;
+  const timer = setInterval(()=>{
+    const t = genRandom();
+    board.classList.remove('empty');
+    frontBalls.forEach((b,i)=>{ b.textContent = pad(t.front[i]); });
+    backBalls.forEach((b,i)=>{ b.textContent = pad(t.back[i]); });
+    if(++ticks >= 10){
+      clearInterval(timer);
+      render(finalData, true);
+      rolling = false;
+      smartBtn.disabled = randomBtn.disabled = false;
+    }
+  }, 55);
+}
+
+smartBtn.addEventListener('click', ()=> playRoll(genSmart()));
+randomBtn.addEventListener('click', ()=> playRoll(genRandom()));
+</script>
+</body>
+</html>
